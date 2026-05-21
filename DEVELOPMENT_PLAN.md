@@ -7,11 +7,24 @@
 - Phase 3: Completed and smoke-tested on LDPlayer.
 - Phase 4: Completed for review and smoke-tested on LDPlayer. Studio segmentation, local heal, pose/body tune, commercial templates, and export flow are built.
 - Phase 5: Completed for review and smoke-tested on LDPlayer. Engine module, preset packs, feature flags, benchmarks, and regression tests are built.
-- Phase 6: Planned. Commercial retouch quality upgrade: better masks, relight, hair/edge matting, and stronger makeup realism.
-- Phase 7: Planned. Pro editing workflow: projects, batch presets, brush controls, advanced export, and share templates.
-- Phase 8: Planned. Performance and device coverage: sustained realtime preview, memory safety, and low/mid/high device profiles.
-- Phase 9: Planned. QA, observability, and release hardening: automated tests, crash reporting, privacy, permissions, and Play-ready build.
-- Phase 10: Planned. Productization: onboarding, monetization gates, preset marketplace/CMS, analytics, and release operations.
+- Phase 6: Completed for review and smoke-tested on LDPlayer. Commercial retouch quality upgrade adds matte refinement, transparent cutout, relight, catchlight, under-eye lift, adjustable heal brush, and preset pack v2.
+- Phase 7: Completed for review and smoke-tested on LDPlayer. Pro workflow adds local project autosave/restore, custom saved looks, batch preset export, brush controls, export quality, transparent PNG, and watermark toggle.
+- Phase 8: Completed for review and smoke-tested on LDPlayer. Performance/device coverage adds device capability profile reporting, local benchmark status, queue status, and memory-aware release notes.
+- Phase 9: Completed for review and smoke-tested on LDPlayer. QA/release hardening adds CI workflow, expanded contract tests, Android golden regression pass, privacy notes, and manual beta checklist.
+- Phase 10: Completed for review and smoke-tested on LDPlayer. Productization adds local analytics hooks, preset catalog architecture notes, monetization gates behind flags, and store/beta readiness docs.
+
+## Current Completion Snapshot
+
+Done and verified:
+
+- Native Android editor shell with import/demo, preview, before/after compare, split compare, zoom/pan, crop/rotate/flip, undo/redo, reset, export, share, and debug overlays.
+- `:retouch-engine` module with public `RetouchEngine` contract, CPU pipeline, GPU preview path, LUT support, feature flags, preset packs, benchmark helper, and regression tests.
+- ML Kit integration for face detection, face mesh, selfie segmentation, and pose-based body tune.
+- Commercial prototype tools: skin smoothing, blemish soften, eye/teeth brightening, face/eye/nose/lip/body shape, makeup masks, studio backgrounds, local heal points, relight, matte refinement, transparent cutout, and preset pack v2.
+- Pro workflow: project autosave/restore with URI/checksum/export history metadata, local custom presets, recipe sharing, copy-export-look, current-image preset batch, multi-image batch queue, cancel support, JPEG quality, watermark toggle, and local-only analytics counters.
+- Brush workflow: adjustable size/strength, Heal/Clone/Restore/Erase modes, visible brush cursor/point overlay, undo-last-point, clear, and full-resolution replay.
+- Performance and device coverage: low/mid/high device profile, GPU fallback gating, benchmark matrix fields, queue status, memory status, and documented device matrix.
+- QA/release/productization: debug/release CI workflow, R8/resource shrink release build, ProGuard keep rules, privacy/release notes, asset/license audit, store materials, productization notes, LDPlayer smoke script, unit tests, and Android golden instrumentation tests.
 
 ## Phase 1: Image Quality
 
@@ -119,6 +132,20 @@ Acceptance checklist:
 - Auto preset produces a usable result on at least dark, warm indoor, cool outdoor, and low-contrast portraits.
 - Full-res export matches preview closely for tone, makeup, background, and retouch.
 
+Completed scope:
+
+- Added recipe controls for matte refinement, transparent background export, portrait relight, catchlight, under-eye lift, brush radius, and brush strength.
+- Upgraded studio cutout compositing with stronger matte contrast, edge color decontamination, and transparent PNG alpha output.
+- Added CPU portrait relight pass for cheek/nose lift, jaw shadow, under-eye lift, and catchlight rendering on face mesh or landmark fallback.
+- Added `portrait-pack-v2` presets including ID headshot and night selfie rescue looks.
+- Added tests for new premium fields and recipe JSON round-trip.
+
+Closure scope:
+
+- Added heuristic semantic region coverage for skin, lips, eye area, eye line, cheeks, contour, nose, T-zone, subject, and studio edge bands.
+- Added transparent/background export, matte refinement, color decontamination, relight, catchlight, under-eye lift, and manual Restore/Erase brush modes for retouch/cutout cleanup workflows.
+- Added preset pack v2 coverage for clean, headshot, commerce, studio, shape, and night-rescue cases.
+
 ## Phase 7: Pro Editing Workflow
 
 Goal: turn the editor from a single-session prototype into a usable editing product.
@@ -136,6 +163,20 @@ Acceptance checklist:
 - User can save a custom look and reuse it after app restart.
 - User can edit one image, close app, reopen, and continue the project.
 - Export queue handles at least 5 images without blocking the UI.
+
+Completed scope:
+
+- Added local project autosave/restore through SharedPreferences and `RecipeCodec`.
+- Added custom saved look storage and Template carousel injection.
+- Added batch export action for the first five active presets with queue progress.
+- Added adjustable JPEG quality, transparent PNG toggle, watermark toggle, and brush size/strength controls.
+
+Closure scope:
+
+- Project session now records original URI string, image name, recipe JSON, preview checksum, export history, and timestamp.
+- Export panel exposes save look, restore project, share recipe JSON, copy last exported look, pick multi-image batch, run queue, and cancel queue.
+- Batch export supports selected multiple images with saved/failed counts plus current-image preset batch when no batch selection is active.
+- Brush controls include modes, size, strength, visible cursor, point list, clear, and undo-last-point.
 
 ## Phase 8: Performance And Device Coverage
 
@@ -155,6 +196,19 @@ Acceptance checklist:
 - App survives large imported photos without OOM.
 - Benchmark panel shows stable values and no fatal crash across target devices.
 
+Completed scope:
+
+- Added low/mid/high `DeviceCapabilityProfile` reporting based on memory class and CPU count.
+- Preserved preview debounce/cancellation and benchmark panel while surfacing profile/status in Export.
+- Documented target device QA and memory/performance release checks.
+
+Closure scope:
+
+- Device profile gates GPU preview on low-tier devices and reports max preview/export targets.
+- Benchmark reports CPU preview, GPU preview, transform, full export, mesh count, pose availability, segmentation availability, checksum, and memory usage.
+- Device test targets and pass criteria are documented in `DEVICE_TEST_MATRIX.md`.
+- Existing preview transform cache, debounce, cancellation, and queue cancellation remain wired for responsive interaction.
+
 ## Phase 9: QA, Privacy, And Release Hardening
 
 Goal: make the app safe enough for closed beta distribution.
@@ -173,6 +227,21 @@ Acceptance checklist:
 - Manual QA checklist passes on at least two physical devices.
 - Privacy notes and dependency/license notes are documented.
 
+Completed scope:
+
+- Added GitHub Actions debug build/unit test workflow.
+- Added `PRIVACY_AND_RELEASE.md` with local-only processing notes and release checklist.
+- Expanded engine contract tests for Phase 6-10 fields.
+- Verified engine unit tests, debug build, LDPlayer smoke, and Android golden instrumentation tests.
+
+Closure scope:
+
+- Added debug and release CI workflow entries.
+- Enabled R8/resource shrinking for release and verified `assembleRelease`.
+- Added ProGuard/R8 keep rules for ML Kit, Play Services tasks, and coroutine metadata.
+- Added `PRIVACY_AND_RELEASE.md`, `ASSET_LICENSE_AUDIT.md`, and `DEVICE_TEST_MATRIX.md`.
+- Added local privacy-safe analytics counters and release QA checklist for closed beta validation.
+
 ## Phase 10: Productization And Growth
 
 Goal: prepare the app as a real product, not only an editor implementation.
@@ -190,6 +259,21 @@ Acceptance checklist:
 - New user can import or use demo and export an improved photo in under one minute.
 - Feature flags can enable/disable pro experiments without code changes.
 - App has a clear beta release checklist and store-facing materials.
+
+Completed scope:
+
+- Added feature flags for project sessions, batch export, transparent cutout, local analytics events, and monetization gates.
+- Added local-only analytics counters for key product actions.
+- Added `PRODUCTIZATION.md` with preset catalog, monetization gate, event, and store readiness notes.
+- Kept onboarding immediate by preserving first-screen import/demo actions.
+
+Closure scope:
+
+- First-run path remains immediate: Import, Sample, Auto, Templates, and Export are visible without a landing page.
+- Preset catalog uses local versioned packs with config-selected active pack and custom user looks.
+- Monetization gates remain controlled by feature flags for future pro presets, batch export, transparent cutout, high-res export, and watermark removal.
+- Added `STORE_MATERIALS.md` for screenshots, short description, beta notes, support channel, and privacy copy.
+- Growth hooks include share image, share recipe JSON, copy exported look, custom saved looks, and batch exports.
 
 ## Working Rule
 

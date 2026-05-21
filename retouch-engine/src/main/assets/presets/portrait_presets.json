@@ -1,5 +1,5 @@
 {
-  "version": "portrait-pack-v1",
+  "version": "portrait-pack-v2",
   "presets": [
     {
       "id": "daily-clean",
@@ -9,7 +9,9 @@
         "exposure": 0.08,
         "contrast": 0.08,
         "saturation": 0.06,
-        "skinSmooth": 0.22
+        "skinSmooth": 0.22,
+        "portraitRelight": 0.12,
+        "catchlight": 0.16
       }
     },
     {
@@ -26,7 +28,10 @@
         "lipPlump": 0.18,
         "lipOpacity": 0.36,
         "blushOpacity": 0.2,
-        "filterLook": "Korean"
+        "filterLook": "Korean",
+        "portraitRelight": 0.16,
+        "underEyeLift": 0.18,
+        "catchlight": 0.2
       }
     },
     {
@@ -56,7 +61,9 @@
         "eyeBright": 0.18,
         "lipOpacity": 0.24,
         "blushOpacity": 0.1,
-        "filterLook": "CoolWhite"
+        "filterLook": "CoolWhite",
+        "portraitRelight": 0.1,
+        "catchlight": 0.14
       }
     },
     {
@@ -85,7 +92,8 @@
         "skinSmooth": 0.16,
         "sharpen": 0.18,
         "cutoutStudio": true,
-        "studioBackdrop": "WarmCream"
+        "studioBackdrop": "WarmCream",
+        "matteRefine": 0.72
       }
     },
     {
@@ -105,7 +113,11 @@
         "filterLook": "CoolWhite",
         "cutoutStudio": true,
         "studioBackdrop": "CoolWhite",
-        "studioStrength": 0.72
+        "studioStrength": 0.72,
+        "matteRefine": 0.78,
+        "portraitRelight": 0.18,
+        "underEyeLift": 0.14,
+        "catchlight": 0.22
       }
     },
     {
@@ -125,7 +137,9 @@
         "filterLook": "WarmPortrait",
         "cutoutStudio": true,
         "studioBackdrop": "WarmCream",
-        "studioStrength": 0.84
+        "studioStrength": 0.84,
+        "matteRefine": 0.8,
+        "portraitRelight": 0.12
       }
     },
     {
@@ -168,7 +182,53 @@
         "filterLook": "CoolWhite",
         "cutoutStudio": true,
         "studioBackdrop": "SoftGray",
-        "studioStrength": 0.68
+        "studioStrength": 0.68,
+        "matteRefine": 0.72,
+        "portraitRelight": 0.16,
+        "underEyeLift": 0.12,
+        "catchlight": 0.16
+      }
+    },
+    {
+      "id": "id-headshot",
+      "title": "ID headshot",
+      "subtitle": "Neutral light and transparent-ready cutout",
+      "recipe": {
+        "exposure": 0.1,
+        "contrast": 0.06,
+        "saturation": -0.05,
+        "warmth": -0.03,
+        "skinSmooth": 0.2,
+        "blemishSoften": 0.16,
+        "eyeBright": 0.16,
+        "sharpen": 0.18,
+        "filterLook": "CoolWhite",
+        "cutoutStudio": true,
+        "studioBackdrop": "CoolWhite",
+        "studioStrength": 0.9,
+        "matteRefine": 0.86,
+        "portraitRelight": 0.16,
+        "catchlight": 0.18
+      }
+    },
+    {
+      "id": "night-selfie-rescue",
+      "title": "Night rescue",
+      "subtitle": "Lift dim faces without heavy makeup",
+      "recipe": {
+        "exposure": 0.18,
+        "contrast": 0.04,
+        "saturation": 0.04,
+        "warmth": 0.05,
+        "skinSmooth": 0.18,
+        "blemishSoften": 0.22,
+        "eyeBright": 0.22,
+        "lipOpacity": 0.18,
+        "blushOpacity": 0.08,
+        "filterLook": "WarmPortrait",
+        "portraitRelight": 0.28,
+        "underEyeLift": 0.2,
+        "catchlight": 0.26
       }
     }
   ]

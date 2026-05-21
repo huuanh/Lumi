@@ -75,6 +75,9 @@ object PhotoProcessor {
         if (!skipMeshMakeup && faceMeshes.isNotEmpty() && recipe.hasMeshMakeup()) {
             applyMeshMakeup(colorPrepared, recipe, faceMeshes)
         }
+        if (recipe.portraitRelight > 0f || recipe.underEyeLift > 0f || recipe.catchlight > 0f) {
+            applyPortraitRelight(colorPrepared, recipe, faceAnchors, faceMeshes)
+        }
 
         val canvas = Canvas(colorPrepared)
         if (recipe.eyeBright > 0f || recipe.teethWhite > 0f) {
@@ -88,6 +91,9 @@ object PhotoProcessor {
         }
         if (!skipVignette && recipe.vignette > 0f) {
             drawVignette(canvas, colorPrepared.width, colorPrepared.height, recipe.vignette)
+        }
+        if (recipe.watermarkEnabled) {
+            drawWatermark(canvas, colorPrepared.width, colorPrepared.height)
         }
 
         return colorPrepared
@@ -219,15 +225,38 @@ object PhotoProcessor {
                 } else {
                     heuristicMask
                 }
-                val replace = ((1f - subject) * strength).coerceIn(0f, 1f)
+                val refinedSubject = refineSubjectMask(subject, heuristicMask, recipe.matteRefine)
+                val replace = ((1f - refinedSubject) * strength).coerceIn(0f, 1f)
                 if (replace <= 0.01f) continue
-                val bg = studioBackgroundColor(x / width.toFloat(), fy, recipe.studioBackdrop)
-                val edgeLift = ((1f - kotlin.math.abs(subject - .5f) * 2f).coerceIn(0f, 1f) * .04f * strength)
-                val mixed = blendColors(pixels[index], bg, replace)
-                pixels[index] = if (edgeLift > 0f) blendColors(mixed, Color.WHITE, edgeLift) else mixed
+                val edge = (1f - kotlin.math.abs(refinedSubject - .5f) * 2f).coerceIn(0f, 1f)
+                if (recipe.transparentBackground) {
+                    val alpha = (refinedSubject * 255f).roundToInt().coerceIn(0, 255)
+                    pixels[index] = (pixels[index] and 0x00FFFFFF) or (alpha shl 24)
+                } else {
+                    val bg = studioBackgroundColor(x / width.toFloat(), fy, recipe.studioBackdrop)
+                    val decontaminated = if (edge > 0f) colorDecontaminate(pixels[index], bg, edge * recipe.matteRefine) else pixels[index]
+                    val edgeLift = edge * .035f * strength * recipe.matteRefine.coerceIn(0f, 1f)
+                    val mixed = blendColors(decontaminated, bg, replace)
+                    pixels[index] = if (edgeLift > 0f) blendColors(mixed, Color.WHITE, edgeLift) else mixed
+                }
             }
         }
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+    }
+
+    private fun refineSubjectMask(subject: Float, heuristic: Float, matteRefine: Float): Float {
+        val refine = matteRefine.coerceIn(0f, 1f)
+        val combined = max(subject, heuristic * (.24f + refine * .28f))
+        val contrast = smoothstep(.08f + refine * .04f, .86f - refine * .12f, combined)
+        return (combined * (1f - refine * .45f) + contrast * refine * .45f).coerceIn(0f, 1f)
+    }
+
+    private fun colorDecontaminate(color: Int, background: Int, amount: Float): Int {
+        val a = amount.coerceIn(0f, .45f)
+        val r = (Color.red(color) + (Color.red(color) - Color.red(background)) * a).roundToInt().coerceIn(0, 255)
+        val g = (Color.green(color) + (Color.green(color) - Color.green(background)) * a).roundToInt().coerceIn(0, 255)
+        val b = (Color.blue(color) + (Color.blue(color) - Color.blue(background)) * a).roundToInt().coerceIn(0, 255)
+        return Color.argb(Color.alpha(color), r, g, b)
     }
 
     private fun subjectMask(
@@ -460,7 +489,12 @@ object PhotoProcessor {
                     val feather = (1f - distance).coerceIn(0f, 1f)
                     val amount = feather * feather * point.strength.coerceIn(0f, 1f)
                     val localSmooth = smoothPixelAt(sourcePixels, width, height, x, y)
-                    val replacement = blendColors(localSmooth, patch, .64f)
+                    val replacement = when (point.mode) {
+                        HealMode.Heal -> blendColors(localSmooth, patch, .64f)
+                        HealMode.Clone -> patch
+                        HealMode.Restore -> sourcePixels[index]
+                        HealMode.Erase -> blendColors(pixels[index], localSmooth, .72f)
+                    }
                     pixels[index] = blendColors(pixels[index], replacement, amount)
                 }
             }
@@ -603,6 +637,86 @@ object PhotoProcessor {
             }
         }
         bitmap.setPixels(outputPixels, 0, width, 0, 0, width, height)
+    }
+
+    private fun applyPortraitRelight(
+        bitmap: Bitmap,
+        recipe: EditRecipe,
+        faceAnchors: List<FaceAnchor>,
+        faceMeshes: List<FaceMeshAnchor>
+    ) {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height).also {
+            bitmap.getPixels(it, 0, width, 0, 0, width, height)
+        }
+        val regions = if (faceMeshes.isNotEmpty()) {
+            faceMeshes.map { it.bounds }
+        } else if (faceAnchors.isNotEmpty()) {
+            faceAnchors.map { it.bounds }
+        } else {
+            listOf(RectF(width * .28f, height * .16f, width * .72f, height * .58f))
+        }
+        regions.forEach { bounds ->
+            val left = (bounds.left - bounds.width() * .18f).roundToInt().coerceIn(0, width - 1)
+            val right = (bounds.right + bounds.width() * .18f).roundToInt().coerceIn(1, width)
+            val top = (bounds.top - bounds.height() * .14f).roundToInt().coerceIn(0, height - 1)
+            val bottom = (bounds.bottom + bounds.height() * .2f).roundToInt().coerceIn(1, height)
+            val cheekLight = AnchorPoint(bounds.centerX() - bounds.width() * .12f, bounds.top + bounds.height() * .54f)
+            val bridgeLight = AnchorPoint(bounds.centerX(), bounds.top + bounds.height() * .38f)
+            val jawShadow = AnchorPoint(bounds.centerX(), bounds.bottom - bounds.height() * .02f)
+            for (y in top until bottom) {
+                for (x in left until right) {
+                    val index = y * width + x
+                    val color = pixels[index]
+                    val skin = FaceMaskUtils.skinWeight(color)
+                    if (skin <= 0f) continue
+                    val relight = recipe.portraitRelight.coerceIn(0f, 1f)
+                    val cheek = FaceMaskUtils.ellipseWeight(x.toFloat(), y.toFloat(), cheekLight, bounds.width() * .36f, bounds.height() * .28f)
+                    val bridge = FaceMaskUtils.ellipseWeight(x.toFloat(), y.toFloat(), bridgeLight, bounds.width() * .12f, bounds.height() * .34f)
+                    val jaw = FaceMaskUtils.ellipseWeight(x.toFloat(), y.toFloat(), jawShadow, bounds.width() * .46f, bounds.height() * .18f)
+                    var adjusted = color
+                    val lift = (cheek * .08f + bridge * .1f) * relight * skin
+                    if (lift > 0f) adjusted = blendColors(adjusted, Color.WHITE, lift.coerceIn(0f, .18f))
+                    val shadow = jaw * relight * skin * .1f
+                    if (shadow > 0f) adjusted = contourShade(adjusted, shadow.coerceIn(0f, .16f))
+                    val underEye = recipe.underEyeLift.coerceIn(0f, 1f) *
+                        underEyeMask(x.toFloat(), y.toFloat(), bounds) * skin
+                    if (underEye > 0f) adjusted = blendColors(adjusted, Color.rgb(255, 238, 222), underEye * .16f)
+                    pixels[index] = adjusted
+                }
+            }
+        }
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+
+        if (recipe.catchlight > 0f) {
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.color = Color.argb((recipe.catchlight.coerceIn(0f, 1f) * 92).roundToInt(), 255, 255, 245)
+            faceMeshes.forEach { mesh ->
+                listOfNotNull(eyeCenter(mesh, left = true), eyeCenter(mesh, left = false)).forEach { eye ->
+                    val radius = mesh.bounds.width() * .018f
+                    canvas.drawCircle(eye.x - radius * .35f, eye.y - radius * .35f, radius, paint)
+                }
+            }
+            if (faceMeshes.isEmpty()) {
+                faceAnchors.forEach { face ->
+                    val radius = face.bounds.width() * .018f
+                    listOfNotNull(face.leftEye, face.rightEye).forEach { eye ->
+                        canvas.drawCircle(eye.x - radius * .35f, eye.y - radius * .35f, radius, paint)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun underEyeMask(x: Float, y: Float, face: RectF): Float {
+        val left = AnchorPoint(face.left + face.width() * .36f, face.top + face.height() * .43f)
+        val right = AnchorPoint(face.right - face.width() * .36f, face.top + face.height() * .43f)
+        return max(
+            FaceMaskUtils.ellipseWeight(x, y, left, face.width() * .12f, face.height() * .055f),
+            FaceMaskUtils.ellipseWeight(x, y, right, face.width() * .12f, face.height() * .055f)
+        )
     }
 
     private fun mapFacePoint(x: Float, y: Float, mesh: FaceMeshAnchor, recipe: EditRecipe): AnchorPoint {
@@ -774,6 +888,18 @@ object PhotoProcessor {
             canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), paint)
             y += step
         }
+    }
+
+    private fun drawWatermark(canvas: Canvas, width: Int, height: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.textAlign = Paint.Align.RIGHT
+        paint.textSize = max(18f, width * .026f)
+        paint.color = Color.argb(138, 255, 255, 255)
+        val x = width - max(14f, width * .025f)
+        val y = height - max(16f, height * .025f)
+        canvas.drawText("Lumi", x + 1f, y + 1f, paint.apply { color = Color.argb(96, 0, 0, 0) })
+        paint.color = Color.argb(158, 255, 255, 255)
+        canvas.drawText("Lumi", x, y, paint)
     }
 
     private fun brightnessMatrix(value: Float): ColorMatrix {

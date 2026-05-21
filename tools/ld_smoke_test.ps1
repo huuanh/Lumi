@@ -21,6 +21,10 @@ function Wait-ForText {
         adb -s $Device shell uiautomator dump /sdcard/window.xml 2>$null | Out-Null
         adb -s $Device pull /sdcard/window.xml .\ld_window.xml 2>$null | Out-Null
         $ErrorActionPreference = $oldPreference
+        if (-not (Test-Path .\ld_window.xml)) {
+            Start-Sleep -Milliseconds 500
+            continue
+        }
         if (Select-String -Path .\ld_window.xml -Pattern "text=`"$Text`"" -Quiet) {
             return $true
         }
@@ -42,6 +46,10 @@ function Wait-ForPattern {
         adb -s $Device shell uiautomator dump /sdcard/window.xml 2>$null | Out-Null
         adb -s $Device pull /sdcard/window.xml .\ld_window.xml 2>$null | Out-Null
         $ErrorActionPreference = $oldPreference
+        if (-not (Test-Path .\ld_window.xml)) {
+            Start-Sleep -Milliseconds 700
+            continue
+        }
         if (Select-String -Path .\ld_window.xml -Pattern $Pattern -Quiet) {
             return $true
         }
@@ -58,7 +66,10 @@ if (-not (Wait-ForText -Text "Sample" -TimeoutSeconds 15)) {
     throw "Smoke failed: Sample button did not appear."
 }
 
-adb -s $Device shell input tap 480 685
+Start-Sleep -Seconds 1
+adb -s $Device shell input tap 568 845
+Start-Sleep -Milliseconds 350
+adb -s $Device shell input tap 568 845
 
 if (-not (Wait-ForPattern -Pattern "1 mesh face|No face detected|face detected" -TimeoutSeconds 30)) {
     throw "Smoke failed: face scan did not finish."

@@ -121,6 +121,9 @@ private fun PhotoEditorApp(viewModel: PhotoEditorViewModel = viewModel()) {
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) viewModel.loadImage(uri)
     }
+    val batchPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        viewModel.setBatchImages(uris)
+    }
     val exportPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.exportPng() else viewModel.notifyExportPermissionDenied()
     }
@@ -147,6 +150,13 @@ private fun PhotoEditorApp(viewModel: PhotoEditorViewModel = viewModel()) {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(Intent.createChooser(shareIntent, "Share edited portrait"))
+                }
+                is EditorEffect.ShareText -> {
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/json"
+                        putExtra(Intent.EXTRA_TEXT, effect.text)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, effect.title))
                 }
             }
         }
@@ -208,10 +218,19 @@ private fun PhotoEditorApp(viewModel: PhotoEditorViewModel = viewModel()) {
                 onMakeupPreset = viewModel::applyMakeupPreset,
                 onToggleHealBrush = viewModel::toggleHealBrush,
                 onClearHeal = viewModel::clearHealPoints,
+                onUndoHeal = viewModel::undoHealPoint,
+                onHealMode = viewModel::setHealMode,
                 onExportFormat = viewModel::setExportFormat,
                 onExport = { exportWithPermission() },
                 onShare = viewModel::shareLastExport,
-                onBenchmark = viewModel::runBenchmark
+                onBenchmark = viewModel::runBenchmark,
+                onSavePreset = viewModel::saveCustomPreset,
+                onRestoreProject = viewModel::restoreSavedProject,
+                onBatchPick = { batchPicker.launch("image/*") },
+                onBatchExport = viewModel::runBatchPresetExport,
+                onBatchCancel = viewModel::cancelBatchExport,
+                onShareRecipe = viewModel::shareRecipe,
+                onCopyExportLook = viewModel::applyLastExportRecipe
             )
         }
     }
@@ -444,6 +463,8 @@ private fun EditorStage(
                         boxWidth = imageBoxSize.width,
                         boxHeight = imageBoxSize.height,
                         healPoints = uiState.recipe.healPoints,
+                        healMode = uiState.healMode,
+                        brushRadius = uiState.recipe.healBrushRadius,
                         pose = uiState.bodyPoseAnchor,
                         showPose = uiState.recipe.bodyTune > 0f,
                         modifier = Modifier.fillMaxSize()
@@ -749,6 +770,8 @@ private fun RetouchControlOverlay(
     boxWidth: Int,
     boxHeight: Int,
     healPoints: List<HealPoint>,
+    healMode: HealMode,
+    brushRadius: Float,
     pose: BodyPoseAnchor?,
     showPose: Boolean,
     modifier: Modifier = Modifier
@@ -768,9 +791,28 @@ private fun RetouchControlOverlay(
         healPoints.takeLast(24).forEach { point ->
             val center = Offset(tx(point.x), ty(point.y))
             val radius = (point.radius * minOf(drawWidth, drawHeight)).coerceIn(8f, 34f)
+            val ring = when (point.mode) {
+                HealMode.Heal -> Flame
+                HealMode.Clone -> Teal
+                HealMode.Restore -> Color(0xFF56C7D5)
+                HealMode.Erase -> Color(0xFFFFC857)
+            }
             drawCircle(Color.Black.copy(alpha = .5f), radius = radius + 2.dp.toPx(), center = center, style = Stroke(width = 2.dp.toPx()))
-            drawCircle(Flame.copy(alpha = .9f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+            drawCircle(ring.copy(alpha = .9f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
             drawCircle(Cream.copy(alpha = .86f), radius = 2.5.dp.toPx(), center = center)
+        }
+
+        if (healPoints.isEmpty()) {
+            val center = Offset(left + drawWidth * .5f, top + drawHeight * .5f)
+            val radius = (brushRadius * minOf(drawWidth, drawHeight)).coerceIn(8f, 42f)
+            val ring = when (healMode) {
+                HealMode.Heal -> Flame
+                HealMode.Clone -> Teal
+                HealMode.Restore -> Color(0xFF56C7D5)
+                HealMode.Erase -> Color(0xFFFFC857)
+            }
+            drawCircle(Color.Black.copy(alpha = .32f), radius = radius + 2.dp.toPx(), center = center, style = Stroke(width = 2.dp.toPx()))
+            drawCircle(ring.copy(alpha = .72f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
         }
 
         if (showPose && pose != null) {
@@ -899,10 +941,19 @@ private fun ControlSheet(
     onMakeupPreset: (MakeupPreset) -> Unit,
     onToggleHealBrush: () -> Unit,
     onClearHeal: () -> Unit,
+    onUndoHeal: () -> Unit,
+    onHealMode: (HealMode) -> Unit,
     onExportFormat: (ExportFormat) -> Unit,
     onExport: () -> Unit,
     onShare: () -> Unit,
-    onBenchmark: () -> Unit
+    onBenchmark: () -> Unit,
+    onSavePreset: () -> Unit,
+    onRestoreProject: () -> Unit,
+    onBatchPick: () -> Unit,
+    onBatchExport: () -> Unit,
+    onBatchCancel: () -> Unit,
+    onShareRecipe: () -> Unit,
+    onCopyExportLook: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -914,10 +965,10 @@ private fun ControlSheet(
         when (uiState.selectedPanel) {
             ToolPanel.Transform -> TransformControls(uiState.recipe, onRotate, onFlip, onCropMode)
             ToolPanel.Adjust -> AdjustControls(uiState.recipe, onRecipeChange)
-            ToolPanel.Beauty -> BeautyControls(uiState, onRecipeChange, onToggleHealBrush, onClearHeal)
+            ToolPanel.Beauty -> BeautyControls(uiState, onRecipeChange, onToggleHealBrush, onClearHeal, onUndoHeal, onHealMode)
             ToolPanel.Makeup -> MakeupControls(uiState.recipe, onRecipeChange, onMakeupPreset)
             ToolPanel.Templates -> TemplateControls(uiState.recipe, uiState.templatePresets, onRecipeChange, onTemplate)
-            ToolPanel.Export -> ExportPanel(uiState, onExport, onShare, onBenchmark, onExportFormat)
+            ToolPanel.Export -> ExportPanel(uiState, onExport, onShare, onBenchmark, onExportFormat, onSavePreset, onRestoreProject, onBatchPick, onBatchExport, onBatchCancel, onShareRecipe, onCopyExportLook, onRecipeChange)
         }
     }
 }
@@ -987,7 +1038,9 @@ private fun BeautyControls(
     uiState: EditorUiState,
     onRecipeChange: (EditRecipe) -> Unit,
     onToggleHealBrush: () -> Unit,
-    onClearHeal: () -> Unit
+    onClearHeal: () -> Unit,
+    onUndoHeal: () -> Unit,
+    onHealMode: (HealMode) -> Unit
 ) {
     val recipe = uiState.recipe
     LazyColumn(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1005,6 +1058,20 @@ private fun BeautyControls(
                     onClick = onClearHeal,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(HealMode.entries) { mode ->
+                    Pill(
+                        text = mode.label,
+                        selected = uiState.healMode == mode,
+                        onClick = { onHealMode(mode) }
+                    )
+                }
+                item {
+                    Pill(text = "Undo point", selected = false, onClick = onUndoHeal)
+                }
             }
         }
         item {
@@ -1038,12 +1105,17 @@ private fun BeautyControls(
         }
         item { RecipeSlider("Skin smooth", recipe.skinSmooth, 0f..1f) { onRecipeChange(recipe.copy(skinSmooth = it)) } }
         item { RecipeSlider("Blemish soften", recipe.blemishSoften, 0f..1f) { onRecipeChange(recipe.copy(blemishSoften = it)) } }
+        item { RecipeSlider("Relight", recipe.portraitRelight, 0f..1f) { onRecipeChange(recipe.copy(portraitRelight = it)) } }
+        item { RecipeSlider("Under eye", recipe.underEyeLift, 0f..1f) { onRecipeChange(recipe.copy(underEyeLift = it)) } }
+        item { RecipeSlider("Catchlight", recipe.catchlight, 0f..1f) { onRecipeChange(recipe.copy(catchlight = it)) } }
         item { RecipeSlider("Eye bright", recipe.eyeBright, 0f..1f) { onRecipeChange(recipe.copy(eyeBright = it)) } }
         item { RecipeSlider("Teeth white", recipe.teethWhite, 0f..1f) { onRecipeChange(recipe.copy(teethWhite = it)) } }
         item { RecipeSlider("Face slim", recipe.faceSlim, 0f..1f) { onRecipeChange(recipe.copy(faceSlim = it)) } }
         item { RecipeSlider("Eye size", recipe.eyeScale, 0f..1f) { onRecipeChange(recipe.copy(eyeScale = it)) } }
         item { RecipeSlider("Nose slim", recipe.noseSlim, 0f..1f) { onRecipeChange(recipe.copy(noseSlim = it)) } }
         item { RecipeSlider("Body tune", recipe.bodyTune, 0f..1f) { onRecipeChange(recipe.copy(bodyTune = it)) } }
+        item { RecipeSlider("Brush size", recipe.healBrushRadius, .008f.. .08f) { onRecipeChange(recipe.copy(healBrushRadius = it)) } }
+        item { RecipeSlider("Brush strength", recipe.healBrushStrength, 0f..1f) { onRecipeChange(recipe.copy(healBrushStrength = it)) } }
     }
 }
 
@@ -1145,6 +1217,30 @@ private fun TemplateControls(
                     }
                 }
             }
+            item {
+                Column(Modifier.padding(horizontal = 14.dp)) {
+                    RecipeSlider("Matte refine", recipe.matteRefine, 0f..1f) {
+                        onRecipeChange(recipe.copy(matteRefine = it))
+                    }
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Pill(
+                        text = "Transparent PNG",
+                        selected = recipe.transparentBackground,
+                        onClick = { onRecipeChange(recipe.copy(transparentBackground = !recipe.transparentBackground, cutoutStudio = true)) }
+                    )
+                    Pill(
+                        text = if (recipe.watermarkEnabled) "Watermark" else "No mark",
+                        selected = recipe.watermarkEnabled,
+                        onClick = { onRecipeChange(recipe.copy(watermarkEnabled = !recipe.watermarkEnabled)) }
+                    )
+                }
+            }
         }
     }
 }
@@ -1219,7 +1315,15 @@ private fun ExportPanel(
     onExport: () -> Unit,
     onShare: () -> Unit,
     onBenchmark: () -> Unit,
-    onFormat: (ExportFormat) -> Unit
+    onFormat: (ExportFormat) -> Unit,
+    onSavePreset: () -> Unit,
+    onRestoreProject: () -> Unit,
+    onBatchPick: () -> Unit,
+    onBatchExport: () -> Unit,
+    onBatchCancel: () -> Unit,
+    onShareRecipe: () -> Unit,
+    onCopyExportLook: () -> Unit,
+    onRecipeChange: (EditRecipe) -> Unit
 ) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -1233,6 +1337,7 @@ private fun ExportPanel(
                 }
             }
         }
+        item { RecipeSlider("JPEG quality", uiState.recipe.exportQuality.toFloat(), 70f..100f) { onRecipeChange(uiState.recipe.copy(exportQuality = it.roundToInt())) } }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
@@ -1257,6 +1362,21 @@ private fun ExportPanel(
                     Spacer(Modifier.width(8.dp))
                     Text("Share")
                 }
+            }
+        }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { Pill(text = "Save look", selected = false, onClick = onSavePreset) }
+                item { Pill(text = "Restore", selected = false, onClick = onRestoreProject) }
+                item { Pill(text = "Share recipe", selected = false, onClick = onShareRecipe) }
+                item { Pill(text = "Copy export", selected = false, onClick = onCopyExportLook) }
+            }
+        }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { Pill(text = "Pick batch", selected = uiState.selectedBatchCount > 0, onClick = onBatchPick) }
+                item { Pill(text = if (uiState.selectedBatchCount > 0) "Run ${uiState.selectedBatchCount}" else "Batch 5", selected = false, onClick = onBatchExport) }
+                item { Pill(text = "Cancel", selected = false, onClick = onBatchCancel) }
             }
         }
         item {
@@ -1317,7 +1437,30 @@ private fun ExportPanel(
                 }
             }
         }
+        if (uiState.exportHistory.isNotEmpty()) {
+            item {
+                Text("Export history", color = Ink, fontWeight = FontWeight.Bold)
+            }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(uiState.exportHistory, key = { it }) { entry ->
+                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp)) {
+                            Text(
+                                entry,
+                                color = Ink,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
         item { Text("${uiState.status} - ${uiState.presetPackVersion} / ${uiState.featureConfigVersion}", color = Muted, style = MaterialTheme.typography.bodySmall) }
+        item { Text("${uiState.sessionStatus} - ${uiState.exportQueueStatus} - batch ${uiState.selectedBatchCount}", color = Muted, style = MaterialTheme.typography.bodySmall) }
+        item { Text("${uiState.deviceProfile.tier.label}: ${uiState.deviceProfile.notes} - ${uiState.analyticsStatus}", color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 2) }
         item { Text(uiState.recipe.toShareText(), color = Color(0xFF5E5A53), style = MaterialTheme.typography.labelSmall, maxLines = 4) }
     }
 }

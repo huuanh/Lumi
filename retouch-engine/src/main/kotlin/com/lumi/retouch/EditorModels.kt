@@ -49,6 +49,19 @@ enum class StudioBackdrop(val label: String) {
     Slate("Slate")
 }
 
+enum class DeviceTier(val label: String) {
+    Low("Low"),
+    Mid("Mid"),
+    High("High")
+}
+
+enum class HealMode(val label: String) {
+    Heal("Heal"),
+    Clone("Clone"),
+    Restore("Restore"),
+    Erase("Erase")
+}
+
 data class EditHistoryItem(
     val title: String,
     val recipe: EditRecipe
@@ -58,7 +71,8 @@ data class HealPoint(
     val x: Float,
     val y: Float,
     val radius: Float = 0.025f,
-    val strength: Float = 0.72f
+    val strength: Float = 0.72f,
+    val mode: HealMode = HealMode.Heal
 )
 
 data class EditRecipe(
@@ -93,6 +107,15 @@ data class EditRecipe(
     val cutoutStudio: Boolean = false,
     val studioBackdrop: StudioBackdrop = StudioBackdrop.SoftGray,
     val studioStrength: Float = 1f,
+    val matteRefine: Float = 0.55f,
+    val transparentBackground: Boolean = false,
+    val portraitRelight: Float = 0f,
+    val catchlight: Float = 0f,
+    val underEyeLift: Float = 0f,
+    val healBrushRadius: Float = 0.025f,
+    val healBrushStrength: Float = 0.72f,
+    val watermarkEnabled: Boolean = false,
+    val exportQuality: Int = 94,
     val healPoints: List<HealPoint> = emptyList()
 ) {
     fun toShareText(): String {
@@ -121,6 +144,15 @@ data class EditRecipe(
               "filterLook": "${filterLook.label}",
               "studioBackdrop": "${studioBackdrop.label}",
               "studioStrength": $studioStrength,
+              "matteRefine": $matteRefine,
+              "transparentBackground": $transparentBackground,
+              "portraitRelight": $portraitRelight,
+              "catchlight": $catchlight,
+              "underEyeLift": $underEyeLift,
+              "healBrushRadius": $healBrushRadius,
+              "healBrushStrength": $healBrushStrength,
+              "watermarkEnabled": $watermarkEnabled,
+              "exportQuality": $exportQuality,
               "healPoints": ${healPoints.size},
               "presetVersion": "${PortraitPipeline.VERSION}",
               "pipelineStages": "${PortraitPipeline.stages.joinToString(" > ") { it.label }}",
@@ -386,6 +418,24 @@ data class BodyPoseAnchor(
     val leftHip: AnchorPoint,
     val rightHip: AnchorPoint,
     val confidence: Float
+)
+
+data class DeviceCapabilityProfile(
+    val tier: DeviceTier,
+    val gpuPreview: Boolean,
+    val maxPreviewSide: Int,
+    val maxExportSide: Int,
+    val notes: String
+)
+
+data class ProjectSession(
+    val id: String,
+    val originalUri: String,
+    val imageName: String,
+    val recipeJson: String,
+    val thumbnailChecksum: Long,
+    val exportHistory: List<String>,
+    val updatedAtMillis: Long
 )
 
 val templatePresets = listOf(

@@ -1,5 +1,5 @@
 {
-  "version": "local-config-v1",
+  "version": "local-config-v2",
   "presetPackPath": "presets/portrait_presets.json",
   "flags": {
     "gpuPreview": true,
@@ -7,6 +7,11 @@
     "poseBodyTune": true,
     "localHeal": true,
     "benchmarkPanel": true,
-    "remotePresetConfig": false
+    "remotePresetConfig": false,
+    "projectSessions": true,
+    "batchExport": true,
+    "transparentCutout": true,
+    "analyticsEvents": true,
+    "monetizationGates": false
   }
 }

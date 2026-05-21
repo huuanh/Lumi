@@ -45,6 +45,9 @@ Native Android prototype for a Xingtu-like photo editor, built as a clean-room a
 - Export panel includes an engine benchmark action that reports CPU/GPU preview timings and deterministic checksums for performance tuning.
 - Engine tests cover preset id uniqueness, readable pipeline metadata, transform-free prepared recipes, JSON config parsing, and Android golden regressions for LUT/checksum/CPU preview behavior.
 - Debug overlay toggle shows face bounds, sampled mesh points, lip polygon, cheek regions, and nose region for mask tuning.
+- Phase 6 quality controls add matte refinement, transparent PNG cutout, portrait relight, under-eye lift, catchlights, adjustable heal brush radius/strength, and curated preset pack v2.
+- Phase 7 workflow adds local project autosave/restore, custom saved looks, batch export for the active preset pack, JPEG quality, transparent cutout, and watermark toggle.
+- Phase 8-10 productization adds device profile reporting, local-only analytics counters, feature flags for pro experiments, CI, privacy/release notes, and beta QA docs.
 
 ## Current limitations
 
@@ -52,7 +55,8 @@ Native Android prototype for a Xingtu-like photo editor, built as a clean-room a
 - GPU preview currently targets the first detected mesh face; full multi-face GPU compositing remains future work.
 - Studio background now uses ML Kit Selfie Segmentation with basic matting. Hair and translucent/low-contrast clothing edges still need stronger alpha matting for production-grade results.
 - Body tune depends on pose visibility. Tight face crops or seated/occluded bodies may fall back to subtle face/neck shaping only.
-- Inpainting and subscription/CMS are not included in this native scaffold.
+- Local heal is brush-point based rather than a full clone/heal stroke engine.
+- Remote subscription, CMS download, and network analytics are intentionally not included in this local beta scaffold.
 
 ## Skills used
 

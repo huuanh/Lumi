@@ -75,7 +75,16 @@ object PresetPackLoader {
             filterLook = enumValue<FilterLook>("filterLook", FilterLook.Clean),
             cutoutStudio = optBoolean("cutoutStudio", false),
             studioBackdrop = enumValue<StudioBackdrop>("studioBackdrop", StudioBackdrop.SoftGray),
-            studioStrength = optFloat("studioStrength", 1f)
+            studioStrength = optFloat("studioStrength", 1f),
+            matteRefine = optFloat("matteRefine", 0.55f),
+            transparentBackground = optBoolean("transparentBackground", false),
+            portraitRelight = optFloat("portraitRelight"),
+            catchlight = optFloat("catchlight"),
+            underEyeLift = optFloat("underEyeLift"),
+            healBrushRadius = optFloat("healBrushRadius", 0.025f),
+            healBrushStrength = optFloat("healBrushStrength", 0.72f),
+            watermarkEnabled = optBoolean("watermarkEnabled", false),
+            exportQuality = optInt("exportQuality", 94).coerceIn(70, 100)
         )
     }
 

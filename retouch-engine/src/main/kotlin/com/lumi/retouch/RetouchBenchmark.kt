@@ -6,6 +6,12 @@ import android.os.SystemClock
 data class BenchmarkResult(
     val cpuMs: Long,
     val gpuMs: Long?,
+    val transformMs: Long,
+    val exportMs: Long,
+    val segmentationMs: Long?,
+    val faceMeshCount: Int,
+    val poseAvailable: Boolean,
+    val memoryKb: Long,
     val cpuChecksum: Long,
     val gpuChecksum: Long?,
     val status: String
@@ -22,7 +28,9 @@ object RetouchBenchmark {
         runGpu: Boolean
     ): BenchmarkResult {
         val preparedRecipe = RetouchEngine.withoutTransform(recipe)
+        val transformStart = SystemClock.elapsedRealtime()
         val transformed = RetouchEngine.transformOnly(source, recipe)
+        val transformMs = (SystemClock.elapsedRealtime() - transformStart).coerceAtLeast(0)
 
         val cpuStart = SystemClock.elapsedRealtime()
         val cpu = RetouchEngine.processPrepared(
@@ -35,6 +43,19 @@ object RetouchBenchmark {
         )
         val cpuMs = (SystemClock.elapsedRealtime() - cpuStart).coerceAtLeast(0)
         val cpuChecksum = checksum(cpu)
+
+        val exportStart = SystemClock.elapsedRealtime()
+        RetouchEngine.process(
+            source = source,
+            recipe = recipe,
+            faceAnchors = faceAnchors,
+            faceMeshes = faceMeshes,
+            personMask = personMask,
+            bodyPose = bodyPose
+        )
+        val exportMs = (SystemClock.elapsedRealtime() - exportStart).coerceAtLeast(0)
+        val runtime = Runtime.getRuntime()
+        val memoryKb = (runtime.totalMemory() - runtime.freeMemory()) / 1024L
 
         val gpuData = if (runGpu) {
             runCatching {
@@ -58,6 +79,8 @@ object RetouchBenchmark {
         val status = buildString {
             append("Bench CPU ${cpuMs}ms")
             gpuData?.let { append(" / GPU ${it.first}ms") }
+            append(" / X ${exportMs}ms")
+            append(" / M ${memoryKb / 1024}MB")
             append(" c")
             append(cpuChecksum.toString(16).takeLast(6))
             gpuData?.let {
@@ -68,6 +91,12 @@ object RetouchBenchmark {
         return BenchmarkResult(
             cpuMs = cpuMs,
             gpuMs = gpuData?.first,
+            transformMs = transformMs,
+            exportMs = exportMs,
+            segmentationMs = if (personMask != null) 0L else null,
+            faceMeshCount = faceMeshes.size,
+            poseAvailable = bodyPose != null,
+            memoryKb = memoryKb,
             cpuChecksum = cpuChecksum,
             gpuChecksum = gpuData?.second,
             status = status

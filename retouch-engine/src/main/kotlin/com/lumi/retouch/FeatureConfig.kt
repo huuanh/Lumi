@@ -9,7 +9,12 @@ data class FeatureFlags(
     val poseBodyTune: Boolean = true,
     val localHeal: Boolean = true,
     val benchmarkPanel: Boolean = true,
-    val remotePresetConfig: Boolean = false
+    val remotePresetConfig: Boolean = false,
+    val projectSessions: Boolean = true,
+    val batchExport: Boolean = true,
+    val transparentCutout: Boolean = true,
+    val analyticsEvents: Boolean = true,
+    val monetizationGates: Boolean = false
 )
 
 data class FeatureConfig(
@@ -42,7 +47,12 @@ object FeatureConfigLoader {
                 poseBodyTune = flags.optBoolean("poseBodyTune", true),
                 localHeal = flags.optBoolean("localHeal", true),
                 benchmarkPanel = flags.optBoolean("benchmarkPanel", true),
-                remotePresetConfig = flags.optBoolean("remotePresetConfig", false)
+                remotePresetConfig = flags.optBoolean("remotePresetConfig", false),
+                projectSessions = flags.optBoolean("projectSessions", true),
+                batchExport = flags.optBoolean("batchExport", true),
+                transparentCutout = flags.optBoolean("transparentCutout", true),
+                analyticsEvents = flags.optBoolean("analyticsEvents", true),
+                monetizationGates = flags.optBoolean("monetizationGates", false)
             )
         )
     }

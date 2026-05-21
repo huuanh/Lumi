@@ -1,6 +1,7 @@
 package com.lumi.retouch
 
 import android.app.Application
+import android.content.Context
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -41,6 +42,8 @@ import java.text.SimpleDateFormat
 import java.nio.ByteOrder
 import java.util.Date
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class EditorUiState(
     val selectedPanel: ToolPanel = ToolPanel.Adjust,
@@ -67,19 +70,29 @@ data class EditorUiState(
     val renderStatus: String = "Preview",
     val imageName: String = "No image loaded",
     val lastExport: ExportedAsset? = null,
+    val lastExportRecipe: EditRecipe? = null,
+    val exportHistory: List<String> = emptyList(),
     val exportFormat: ExportFormat = ExportFormat.Png,
     val editHistory: List<EditHistoryItem> = emptyList(),
     val healBrushEnabled: Boolean = false,
     val templatePresets: List<TemplatePreset> = com.lumi.retouch.templatePresets,
+    val customPresets: List<TemplatePreset> = emptyList(),
     val presetPackVersion: String = "builtin",
     val featureConfigVersion: String = "builtin-flags",
     val featureFlags: FeatureFlags = FeatureFlags(),
-    val benchmarkStatus: String = "Benchmark not run"
+    val benchmarkStatus: String = "Benchmark not run",
+    val sessionStatus: String = "No saved project",
+    val exportQueueStatus: String = "Queue idle",
+    val selectedBatchCount: Int = 0,
+    val healMode: HealMode = HealMode.Heal,
+    val analyticsStatus: String = "Events local-only",
+    val deviceProfile: DeviceCapabilityProfile = DeviceCapabilityProfile(DeviceTier.Mid, true, 1080, 4096, "Default")
 )
 
 sealed interface EditorEffect {
     data class ShowSnackbar(val message: String) : EditorEffect
     data class ShareImage(val asset: ExportedAsset) : EditorEffect
+    data class ShareText(val title: String, val text: String) : EditorEffect
 }
 
 private data class FaceScanResult(
@@ -116,6 +129,11 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
     private var cachedPreviewTransformed: Bitmap? = null
     private var featureConfig = FeatureConfigLoader.fallbackConfig()
     private var gpuPreviewAvailable = true
+    private val prefs = application.getSharedPreferences("lumi_projects", Context.MODE_PRIVATE)
+    private val analyticsEvents = ArrayDeque<String>()
+    private var currentImageUri: Uri? = null
+    private var batchUris: List<Uri> = emptyList()
+    private var batchJob: Job? = null
     private val faceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
@@ -147,15 +165,28 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
         featureConfig = FeatureConfigLoader.loadFromAssets(application.assets)
         gpuPreviewAvailable = featureConfig.flags.gpuPreview
         val presetPack = PresetPackLoader.loadFromAssets(application.assets, featureConfig.presetPackPath)
+        val restoredRecipe = restoreRecipe()
+        val customPresets = restoreCustomPresets()
+        val restoredProject = restoreProjectSession()
+        val profile = detectDeviceProfile()
+        gpuPreviewAvailable = profile.gpuPreview
         _uiState.update {
+            val projectRecipe = restoredProject?.let { project -> runCatching { RecipeCodec.decode(project.recipeJson) }.getOrNull() }
             it.copy(
-                templatePresets = presetPack.presets,
+                recipe = restoredRecipe ?: projectRecipe ?: it.recipe,
+                templatePresets = presetPack.presets + customPresets,
+                customPresets = customPresets,
                 presetPackVersion = presetPack.version,
                 featureConfigVersion = featureConfig.version,
                 featureFlags = featureConfig.flags,
-                status = "Preset ${presetPack.version} / config ${featureConfig.version}"
+                deviceProfile = profile,
+                exportHistory = restoredProject?.exportHistory ?: emptyList(),
+                sessionStatus = restoredProject?.let { project -> "Project restored: ${project.imageName}" }
+                    ?: if (restoredRecipe != null) "Saved look restored" else "No saved project",
+                status = "Preset ${presetPack.version} / config ${featureConfig.version} / ${profile.tier.label}"
             )
         }
+        trackEvent("app_start:${profile.tier.name.lowercase(Locale.US)}")
     }
 
     fun selectPanel(panel: ToolPanel) {
@@ -163,6 +194,7 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadDemo() {
+        currentImageUri = null
         val bitmap = BitmapFactory.decodeResource(getApplication<Application>().resources, R.drawable.sample_color_face)
             ?: BitmapFactory.decodeResource(getApplication<Application>().resources, R.drawable.sample_color_portrait)
             ?: BitmapFactory.decodeResource(getApplication<Application>().resources, R.drawable.sample_portrait)
@@ -188,12 +220,15 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                 status = "Color sample loaded"
             )
         }
+        persistProjectSnapshot("demo://sample_color_face", "Color sample portrait")
         showSnackbar("Color sample loaded")
+        trackEvent("demo_loaded")
         detectFacesForCurrentRecipe()
     }
 
     fun loadImage(uri: Uri) {
         viewModelScope.launch {
+            currentImageUri = uri
             _uiState.update { it.copy(isProcessing = true, processingLabel = "Loading image", status = "Loading image") }
             val bitmap = withContext(Dispatchers.IO) { decodeBitmap(uri) }
             if (bitmap == null) {
@@ -228,7 +263,9 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                     faceStatus = "Scanning faces"
                 )
             }
+            persistProjectSnapshot(uri.toString(), "Imported image")
             _effects.emit(EditorEffect.ShowSnackbar("Image loaded"))
+            trackEvent("image_loaded")
             detectFacesForCurrentRecipe()
         }
     }
@@ -329,11 +366,29 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
         updateRecipe(_uiState.value.recipe.copy(healPoints = emptyList()), "Heal cleared")
     }
 
+    fun undoHealPoint() {
+        val points = _uiState.value.recipe.healPoints
+        if (points.isEmpty()) return
+        updateRecipe(_uiState.value.recipe.copy(healPoints = points.dropLast(1)), "Heal undo")
+    }
+
+    fun setHealMode(mode: HealMode) {
+        _uiState.update { it.copy(healMode = mode, status = "${mode.label} brush") }
+        trackEvent("heal_mode:${mode.name.lowercase(Locale.US)}")
+    }
+
     fun addHealPoint(x: Float, y: Float) {
         if (!featureConfig.flags.localHeal) return
         val recipe = _uiState.value.recipe
-        val point = HealPoint(x = x.coerceIn(0f, 1f), y = y.coerceIn(0f, 1f))
+        val point = HealPoint(
+            x = x.coerceIn(0f, 1f),
+            y = y.coerceIn(0f, 1f),
+            radius = recipe.healBrushRadius,
+            strength = recipe.healBrushStrength,
+            mode = _uiState.value.healMode
+        )
         updateRecipe(recipe.copy(healPoints = (recipe.healPoints + point).takeLast(80)), "Heal point")
+        trackEvent("heal_point")
     }
 
     fun runBenchmark() {
@@ -382,6 +437,164 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setExportFormat(format: ExportFormat) {
         _uiState.update { it.copy(exportFormat = format, status = "Export ${format.label}") }
+    }
+
+    fun shareRecipe() {
+        val text = RecipeCodec.encode(_uiState.value.recipe)
+        _effects.tryEmit(EditorEffect.ShareText("Share Lumi recipe", text))
+        trackEvent("recipe_share")
+    }
+
+    fun applyLastExportRecipe() {
+        val recipe = _uiState.value.lastExportRecipe
+        if (recipe == null) {
+            showSnackbar("No exported look yet")
+            return
+        }
+        updateRecipe(recipe, "Copied export look")
+        trackEvent("copy_export_look")
+    }
+
+    fun importRecipeJson(raw: String) {
+        val recipe = runCatching { RecipeCodec.decode(raw) }.getOrNull()
+        if (recipe == null) {
+            showSnackbar("Recipe import failed")
+            return
+        }
+        updateRecipe(recipe, "Recipe imported")
+        trackEvent("recipe_import")
+    }
+
+    fun setBatchImages(uris: List<Uri>) {
+        batchUris = uris.take(50)
+        _uiState.update {
+            it.copy(
+                selectedBatchCount = batchUris.size,
+                exportQueueStatus = if (batchUris.isEmpty()) "Queue idle" else "Batch images ${batchUris.size}",
+                status = if (batchUris.isEmpty()) "Batch cleared" else "Batch images selected"
+            )
+        }
+        trackEvent("batch_select:${batchUris.size}")
+    }
+
+    fun cancelBatchExport() {
+        batchJob?.cancel()
+        batchJob = null
+        _uiState.update {
+            it.copy(
+                isProcessing = false,
+                processingLabel = "",
+                exportQueueStatus = "Queue cancelled",
+                status = "Batch cancelled"
+            )
+        }
+        trackEvent("batch_cancel")
+    }
+
+    fun saveCustomPreset() {
+        if (!featureConfig.flags.projectSessions) {
+            showSnackbar("Custom presets disabled by config")
+            return
+        }
+        val stamp = SimpleDateFormat("HHmmss", Locale.US).format(Date())
+        val preset = TemplatePreset(
+            id = "custom-$stamp",
+            title = "My look",
+            subtitle = "Saved local preset",
+            recipe = _uiState.value.recipe.copy(healPoints = emptyList())
+        )
+        val custom = (listOf(preset) + _uiState.value.customPresets).take(12)
+        persistCustomPresets(custom)
+        _uiState.update {
+            it.copy(
+                customPresets = custom,
+                templatePresets = it.templatePresets.filterNot { preset -> preset.id.startsWith("custom-") } + custom,
+                sessionStatus = "Custom preset saved",
+                status = "Custom preset saved"
+            )
+        }
+        trackEvent("custom_preset_saved")
+        showSnackbar("Custom preset saved")
+    }
+
+    fun restoreSavedProject() {
+        val recipe = restoreRecipe()
+        if (recipe == null) {
+            showSnackbar("No saved project")
+            return
+        }
+        applyRecipeWithoutHistory(recipe, "Project restored")
+        _uiState.update { it.copy(sessionStatus = "Saved project restored") }
+        trackEvent("project_restored")
+    }
+
+    fun runBatchPresetExport() {
+        val source = _uiState.value.sourceBitmap
+        val queue = batchUris
+        if (source == null && queue.isEmpty()) {
+            showSnackbar("Load an image before batch export")
+            return
+        }
+        if (!featureConfig.flags.batchExport) {
+            showSnackbar("Batch export disabled by config")
+            return
+        }
+        val presets = if (queue.isEmpty()) _uiState.value.templatePresets.take(5) else listOf(TemplatePreset("current", "Current look", "Current recipe", _uiState.value.recipe))
+        if (presets.isEmpty()) return
+        batchJob?.cancel()
+        batchJob = viewModelScope.launch {
+            val total = if (queue.isEmpty()) presets.size else queue.size
+            _uiState.update {
+                it.copy(
+                    isProcessing = true,
+                    processingLabel = "Batch exporting",
+                    exportQueueStatus = "Queue 0/$total",
+                    status = "Batch export started"
+                )
+            }
+            var saved = 0
+            var failed = 0
+            if (queue.isEmpty()) {
+                presets.forEachIndexed { index, preset ->
+                    val output = withContext(Dispatchers.Default) {
+                        RetouchEngine.process(
+                            source = source!!,
+                            recipe = preset.recipe,
+                            faceAnchors = _uiState.value.faceAnchors,
+                            faceMeshes = _uiState.value.faceMeshAnchors,
+                            bodyPose = _uiState.value.bodyPoseAnchor
+                        )
+                    }
+                    val asset = withContext(Dispatchers.IO) { saveBitmap(output, _uiState.value.exportFormat) }
+                    if (asset != null) saved++ else failed++
+                    _uiState.update { it.copy(exportQueueStatus = "Queue ${index + 1}/$total") }
+                }
+            } else {
+                queue.forEachIndexed { index, uri ->
+                    val bitmap = withContext(Dispatchers.IO) { decodeBitmap(uri) }
+                    if (bitmap == null) {
+                        failed++
+                    } else {
+                        val output = withContext(Dispatchers.Default) {
+                            RetouchEngine.process(source = bitmap, recipe = _uiState.value.recipe)
+                        }
+                        val asset = withContext(Dispatchers.IO) { saveBitmap(output, _uiState.value.exportFormat) }
+                        if (asset != null) saved++ else failed++
+                    }
+                    _uiState.update { it.copy(exportQueueStatus = "Queue ${index + 1}/$total") }
+                }
+            }
+            _uiState.update {
+                it.copy(
+                    isProcessing = false,
+                    processingLabel = "",
+                    exportQueueStatus = "Saved $saved/$total, failed $failed",
+                    status = "Batch export finished"
+                )
+            }
+            trackEvent("batch_export:$saved:$failed")
+            showSnackbar("Batch saved $saved/$total")
+        }
     }
 
     fun autoEnhance() {
@@ -456,6 +669,8 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                 editHistory = history
             )
         }
+        persistRecipe(recipe)
+        trackEvent("recipe_updated:${status.take(24)}")
         reprocess(scanFacesAfter = transformChanged || needsSegmentationScan || needsPoseScan)
     }
 
@@ -475,6 +690,7 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                 showSplitCompare = false
             )
         }
+        persistRecipe(recipe)
         reprocess(scanFacesAfter = transformChanged || needsSegmentationScan || needsPoseScan)
     }
 
@@ -540,14 +756,25 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                 withContext(Dispatchers.IO) { saveBitmap(exportBitmap, format) }
             }.getOrNull()
             _uiState.update {
+                val nextHistory = if (savedImage == null) {
+                    it.exportHistory
+                } else {
+                    (listOf("${savedImage.format.label} ${savedImage.displayName}") + it.exportHistory).take(12)
+                }
                 it.copy(
                     isProcessing = false,
                     processingLabel = "",
                     status = if (savedImage == null) "Export failed" else "Saved ${savedImage.displayName}",
                     lastExport = savedImage,
+                    lastExportRecipe = if (savedImage == null) it.lastExportRecipe else recipe,
+                    exportHistory = nextHistory,
                     renderStatus = "Fast preview"
                 )
             }
+            if (savedImage != null) {
+                persistProjectSnapshot(currentImageUri?.toString() ?: "demo://sample_color_face", _uiState.value.imageName)
+            }
+            if (savedImage != null) trackEvent("export_success:${format.extension}") else trackEvent("export_failed:${format.extension}")
             _effects.emit(EditorEffect.ShowSnackbar(if (savedImage == null) "Export failed" else "Saved ${savedImage.displayName}"))
         }
     }
@@ -912,7 +1139,7 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
                 ExportFormat.Png -> Bitmap.CompressFormat.PNG
                 ExportFormat.Jpeg -> Bitmap.CompressFormat.JPEG
             }
-            bitmap.compress(compressFormat, if (format == ExportFormat.Png) 100 else 94, out)
+            bitmap.compress(compressFormat, if (format == ExportFormat.Png) 100 else _uiState.value.recipe.exportQuality.coerceIn(70, 100), out)
         } ?: return null
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1042,6 +1269,121 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
         _effects.tryEmit(EditorEffect.ShowSnackbar(message))
     }
 
+    private fun persistRecipe(recipe: EditRecipe) {
+        if (!featureConfig.flags.projectSessions) return
+        prefs.edit()
+            .putString(KEY_LAST_RECIPE, RecipeCodec.encode(recipe))
+            .putLong(KEY_LAST_PROJECT_TS, System.currentTimeMillis())
+            .apply()
+        persistProjectSnapshot(currentImageUri?.toString() ?: "demo://sample_color_face", _uiState.value.imageName)
+        _uiState.update { it.copy(sessionStatus = "Project autosaved") }
+    }
+
+    private fun restoreRecipe(): EditRecipe? {
+        val raw = prefs.getString(KEY_LAST_RECIPE, null) ?: return null
+        return runCatching { RecipeCodec.decode(raw) }.getOrNull()
+    }
+
+    private fun persistProjectSnapshot(originalUri: String, imageName: String) {
+        if (!featureConfig.flags.projectSessions) return
+        val preview = _uiState.value.previewBitmap ?: _uiState.value.previewSourceBitmap
+        val checksum = preview?.let { RetouchBenchmark.checksum(it) } ?: 0L
+        val project = ProjectSession(
+            id = "last-project",
+            originalUri = originalUri,
+            imageName = imageName,
+            recipeJson = RecipeCodec.encode(_uiState.value.recipe),
+            thumbnailChecksum = checksum,
+            exportHistory = _uiState.value.exportHistory,
+            updatedAtMillis = System.currentTimeMillis()
+        )
+        prefs.edit().putString(KEY_PROJECT_SESSION, encodeProject(project)).apply()
+    }
+
+    private fun restoreProjectSession(): ProjectSession? {
+        val raw = prefs.getString(KEY_PROJECT_SESSION, null) ?: return null
+        return runCatching { decodeProject(raw) }.getOrNull()
+    }
+
+    private fun encodeProject(project: ProjectSession): String {
+        return JSONObject()
+            .put("id", project.id)
+            .put("originalUri", project.originalUri)
+            .put("imageName", project.imageName)
+            .put("recipeJson", project.recipeJson)
+            .put("thumbnailChecksum", project.thumbnailChecksum)
+            .put("exportHistory", JSONArray(project.exportHistory))
+            .put("updatedAtMillis", project.updatedAtMillis)
+            .toString()
+    }
+
+    private fun decodeProject(json: String): ProjectSession {
+        val root = JSONObject(json)
+        val history = root.optJSONArray("exportHistory")
+        return ProjectSession(
+            id = root.optString("id", "last-project"),
+            originalUri = root.optString("originalUri"),
+            imageName = root.optString("imageName", "Restored project"),
+            recipeJson = root.getString("recipeJson"),
+            thumbnailChecksum = root.optLong("thumbnailChecksum", 0L),
+            exportHistory = List(history?.length() ?: 0) { index -> history!!.optString(index) },
+            updatedAtMillis = root.optLong("updatedAtMillis", 0L)
+        )
+    }
+
+    private fun persistCustomPresets(presets: List<TemplatePreset>) {
+        val json = JSONArray(presets.map { preset ->
+            JSONObject()
+                .put("id", preset.id)
+                .put("title", preset.title)
+                .put("subtitle", preset.subtitle)
+                .put("recipe", RecipeCodec.encode(preset.recipe))
+        }).toString()
+        prefs.edit().putString(KEY_CUSTOM_PRESETS, json).apply()
+    }
+
+    private fun restoreCustomPresets(): List<TemplatePreset> {
+        val raw = prefs.getString(KEY_CUSTOM_PRESETS, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                TemplatePreset(
+                    id = item.optString("id", "custom-$index"),
+                    title = item.optString("title", "My look"),
+                    subtitle = item.optString("subtitle", "Saved local preset"),
+                    recipe = RecipeCodec.decode(item.getString("recipe"))
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun detectDeviceProfile(): DeviceCapabilityProfile {
+        val memoryClass = getApplication<Application>()
+            .getSystemService(android.app.ActivityManager::class.java)
+            ?.memoryClass ?: 256
+        val processors = Runtime.getRuntime().availableProcessors()
+        val tier = when {
+            memoryClass < 192 || processors <= 4 -> DeviceTier.Low
+            memoryClass >= 384 && processors >= 8 -> DeviceTier.High
+            else -> DeviceTier.Mid
+        }
+        return when (tier) {
+            DeviceTier.Low -> DeviceCapabilityProfile(tier, gpuPreview = false, maxPreviewSide = 840, maxExportSide = 2600, notes = "Low memory guard")
+            DeviceTier.Mid -> DeviceCapabilityProfile(tier, gpuPreview = featureConfig.flags.gpuPreview, maxPreviewSide = 1080, maxExportSide = 4096, notes = "Balanced preview")
+            DeviceTier.High -> DeviceCapabilityProfile(tier, gpuPreview = featureConfig.flags.gpuPreview, maxPreviewSide = 1440, maxExportSide = 5200, notes = "High quality")
+        }
+    }
+
+    private fun trackEvent(name: String) {
+        if (!featureConfig.flags.analyticsEvents) return
+        analyticsEvents.addLast("${System.currentTimeMillis()}:$name")
+        while (analyticsEvents.size > 32) analyticsEvents.removeFirst()
+        _uiState.update {
+            it.copy(analyticsStatus = "Local events ${analyticsEvents.size}: ${name.take(28)}")
+        }
+    }
+
     private suspend fun renderPreview(
         source: Bitmap,
         recipe: EditRecipe,
@@ -1083,6 +1425,10 @@ class PhotoEditorViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     companion object {
+        private const val KEY_LAST_RECIPE = "last_recipe"
+        private const val KEY_LAST_PROJECT_TS = "last_project_ts"
+        private const val KEY_CUSTOM_PRESETS = "custom_presets"
+        private const val KEY_PROJECT_SESSION = "project_session"
         private const val PREVIEW_MAX_SIDE = 1080
         private const val EXPORT_MAX_SIDE = 4096
         private const val PREVIEW_DEBOUNCE_MS = 45L
