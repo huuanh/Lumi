@@ -1,0 +1,12 @@
+{
+  "version": "local-config-v1",
+  "presetPackPath": "presets/portrait_presets.json",
+  "flags": {
+    "gpuPreview": true,
+    "studioSegmentation": true,
+    "poseBodyTune": true,
+    "localHeal": true,
+    "benchmarkPanel": true,
+    "remotePresetConfig": false
+  }
+}

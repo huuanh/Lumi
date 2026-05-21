@@ -1,0 +1,175 @@
+{
+  "version": "portrait-pack-v1",
+  "presets": [
+    {
+      "id": "daily-clean",
+      "title": "Daily clean",
+      "subtitle": "Bright skin, controlled contrast",
+      "recipe": {
+        "exposure": 0.08,
+        "contrast": 0.08,
+        "saturation": 0.06,
+        "skinSmooth": 0.22
+      }
+    },
+    {
+      "id": "portrait-soft",
+      "title": "Portrait soft",
+      "subtitle": "Beauty retouch and light makeup",
+      "recipe": {
+        "exposure": 0.05,
+        "warmth": 0.08,
+        "skinSmooth": 0.42,
+        "blemishSoften": 0.35,
+        "eyeBright": 0.24,
+        "eyeScale": 0.18,
+        "lipPlump": 0.18,
+        "lipOpacity": 0.36,
+        "blushOpacity": 0.2,
+        "filterLook": "Korean"
+      }
+    },
+    {
+      "id": "street-snap",
+      "title": "Street snap",
+      "subtitle": "Film color, texture, social-ready",
+      "recipe": {
+        "contrast": 0.22,
+        "saturation": 0.18,
+        "warmth": -0.08,
+        "sharpen": 0.25,
+        "vignette": 0.28,
+        "filterLook": "Film"
+      }
+    },
+    {
+      "id": "cool-white",
+      "title": "Cool white",
+      "subtitle": "Clear white skin and soft lips",
+      "recipe": {
+        "exposure": 0.08,
+        "contrast": 0.04,
+        "saturation": -0.03,
+        "warmth": -0.1,
+        "skinSmooth": 0.28,
+        "blemishSoften": 0.2,
+        "eyeBright": 0.18,
+        "lipOpacity": 0.24,
+        "blushOpacity": 0.1,
+        "filterLook": "CoolWhite"
+      }
+    },
+    {
+      "id": "warm-portrait",
+      "title": "Warm portrait",
+      "subtitle": "Warm skin tone and gentle makeup",
+      "recipe": {
+        "exposure": 0.06,
+        "contrast": 0.08,
+        "saturation": 0.04,
+        "warmth": 0.1,
+        "skinSmooth": 0.24,
+        "blemishSoften": 0.18,
+        "lipOpacity": 0.28,
+        "blushOpacity": 0.18,
+        "filterLook": "WarmPortrait"
+      }
+    },
+    {
+      "id": "commerce-cutout",
+      "title": "Commerce cutout",
+      "subtitle": "Subject lift and studio background",
+      "recipe": {
+        "exposure": 0.12,
+        "contrast": 0.06,
+        "skinSmooth": 0.16,
+        "sharpen": 0.18,
+        "cutoutStudio": true,
+        "studioBackdrop": "WarmCream"
+      }
+    },
+    {
+      "id": "profile-headshot",
+      "title": "Profile headshot",
+      "subtitle": "Clean face, cool white studio",
+      "recipe": {
+        "exposure": 0.1,
+        "contrast": 0.07,
+        "saturation": -0.04,
+        "warmth": -0.06,
+        "skinSmooth": 0.26,
+        "blemishSoften": 0.2,
+        "eyeBright": 0.22,
+        "teethWhite": 0.12,
+        "sharpen": 0.16,
+        "filterLook": "CoolWhite",
+        "cutoutStudio": true,
+        "studioBackdrop": "CoolWhite",
+        "studioStrength": 0.72
+      }
+    },
+    {
+      "id": "product-portrait",
+      "title": "Product portrait",
+      "subtitle": "Warm commerce tone and cutout",
+      "recipe": {
+        "exposure": 0.12,
+        "contrast": 0.1,
+        "saturation": 0.03,
+        "warmth": 0.06,
+        "skinSmooth": 0.18,
+        "blemishSoften": 0.16,
+        "lipOpacity": 0.18,
+        "blushOpacity": 0.08,
+        "sharpen": 0.22,
+        "filterLook": "WarmPortrait",
+        "cutoutStudio": true,
+        "studioBackdrop": "WarmCream",
+        "studioStrength": 0.84
+      }
+    },
+    {
+      "id": "studio-slate",
+      "title": "Studio slate",
+      "subtitle": "Dark editorial profile look",
+      "recipe": {
+        "exposure": 0.03,
+        "contrast": 0.2,
+        "saturation": -0.02,
+        "warmth": -0.04,
+        "skinSmooth": 0.2,
+        "blemishSoften": 0.14,
+        "eyeBright": 0.16,
+        "contour": 0.12,
+        "sharpen": 0.2,
+        "filterLook": "Neo",
+        "cutoutStudio": true,
+        "studioBackdrop": "Slate",
+        "studioStrength": 0.76
+      }
+    },
+    {
+      "id": "shape-studio",
+      "title": "Shape studio",
+      "subtitle": "Profile tone with subtle body tune",
+      "recipe": {
+        "exposure": 0.08,
+        "contrast": 0.09,
+        "saturation": -0.02,
+        "warmth": -0.03,
+        "skinSmooth": 0.22,
+        "blemishSoften": 0.18,
+        "eyeBright": 0.18,
+        "faceSlim": 0.12,
+        "noseSlim": 0.08,
+        "bodyTune": 0.18,
+        "contour": 0.1,
+        "sharpen": 0.18,
+        "filterLook": "CoolWhite",
+        "cutoutStudio": true,
+        "studioBackdrop": "SoftGray",
+        "studioStrength": 0.68
+      }
+    }
+  ]
+}

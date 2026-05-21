@@ -1,0 +1,10 @@
+.gradle/
+build/
+app/build/
+retouch-engine/build/
+local.properties
+*.iml
+.idea/
+ld_*.png
+ld_*.txt
+ld_*.xml
