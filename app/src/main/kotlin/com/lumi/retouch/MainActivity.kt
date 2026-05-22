@@ -13,6 +13,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -97,6 +99,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.max
@@ -163,7 +166,7 @@ private fun PhotoEditorApp(viewModel: PhotoEditorViewModel = viewModel()) {
     }
 
     Scaffold(
-        containerColor = Cream,
+        containerColor = StudioBlack,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopBar(
@@ -194,44 +197,65 @@ private fun PhotoEditorApp(viewModel: PhotoEditorViewModel = viewModel()) {
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            EditorStage(
-                uiState = uiState,
-                onPick = { imagePicker.launch("image/*") },
-                onDemo = viewModel::loadDemo,
-                onComparePressChange = viewModel::setCompareOriginal,
-                onSplitFractionChange = viewModel::setSplitCompareFraction,
-                onHealTap = viewModel::addHealPoint,
-                modifier = Modifier.weight(1f)
+            Image(
+                painter = painterResource(R.drawable.lumi_editor_bg),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
-            ControlSheet(
-                uiState = uiState,
-                onRecipeChange = viewModel::updateRecipe,
-                onRotate = viewModel::rotateRight,
-                onFlip = viewModel::flipHorizontal,
-                onCropMode = viewModel::setCropMode,
-                onTemplate = viewModel::applyTemplate,
-                onMakeupPreset = viewModel::applyMakeupPreset,
-                onToggleHealBrush = viewModel::toggleHealBrush,
-                onClearHeal = viewModel::clearHealPoints,
-                onUndoHeal = viewModel::undoHealPoint,
-                onHealMode = viewModel::setHealMode,
-                onExportFormat = viewModel::setExportFormat,
-                onExport = { exportWithPermission() },
-                onShare = viewModel::shareLastExport,
-                onBenchmark = viewModel::runBenchmark,
-                onSavePreset = viewModel::saveCustomPreset,
-                onRestoreProject = viewModel::restoreSavedProject,
-                onBatchPick = { batchPicker.launch("image/*") },
-                onBatchExport = viewModel::runBatchPresetExport,
-                onBatchCancel = viewModel::cancelBatchExport,
-                onShareRecipe = viewModel::shareRecipe,
-                onCopyExportLook = viewModel::applyLastExportRecipe
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = .08f),
+                                StudioBlack.copy(alpha = .18f),
+                                StudioBlack.copy(alpha = .62f)
+                            )
+                        )
+                    )
             )
+            Column(Modifier.fillMaxSize()) {
+                EditorStage(
+                    uiState = uiState,
+                    onPick = { imagePicker.launch("image/*") },
+                    onDemo = viewModel::loadDemo,
+                    onComparePressChange = viewModel::setCompareOriginal,
+                    onSplitFractionChange = viewModel::setSplitCompareFraction,
+                    onHealTap = viewModel::addHealPoint,
+                    modifier = Modifier.weight(1f)
+                )
+                ControlSheet(
+                    uiState = uiState,
+                    onRecipeChange = viewModel::updateRecipe,
+                    onRotate = viewModel::rotateRight,
+                    onFlip = viewModel::flipHorizontal,
+                    onCropMode = viewModel::setCropMode,
+                    onTemplate = viewModel::applyTemplate,
+                    onMakeupPreset = viewModel::applyMakeupPreset,
+                    onToggleHealBrush = viewModel::toggleHealBrush,
+                    onClearHeal = viewModel::clearHealPoints,
+                    onUndoHeal = viewModel::undoHealPoint,
+                    onHealMode = viewModel::setHealMode,
+                    onExportFormat = viewModel::setExportFormat,
+                    onExport = { exportWithPermission() },
+                    onShare = viewModel::shareLastExport,
+                    onBenchmark = viewModel::runBenchmark,
+                    onSavePreset = viewModel::saveCustomPreset,
+                    onRestoreProject = viewModel::restoreSavedProject,
+                    onBatchPick = { batchPicker.launch("image/*") },
+                    onBatchExport = viewModel::runBatchPresetExport,
+                    onBatchCancel = viewModel::cancelBatchExport,
+                    onShareRecipe = viewModel::shareRecipe,
+                    onCopyExportLook = viewModel::applyLastExportRecipe
+                )
+            }
         }
     }
 }
@@ -257,42 +281,48 @@ private fun TopBar(
     onDebug: () -> Unit,
     onExport: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Cream)
-            .height(52.dp)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(StudioBlack)
+            .height(96.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(Ink),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("L", color = Cream, fontWeight = FontWeight.Black)
-        }
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = Ink, fontWeight = FontWeight.Black, maxLines = 1)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CompactIconButton(onClick = onPick, icon = Icons.Outlined.Image, tint = Ink, enabled = !isProcessing, contentDescription = "Pick image")
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Brush.linearGradient(listOf(Coral, Teal))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("L", color = Color.White, fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Black, maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = SoftText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            CompactIconButton(onClick = onExport, icon = Icons.Outlined.Download, tint = Coral, enabled = hasImage && !isProcessing, contentDescription = "Export")
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CompactIconButton(onClick = onPick, icon = Icons.Outlined.Image, tint = Color.White, enabled = !isProcessing, contentDescription = "Pick image")
             CompactTextButton(text = "Auto", enabled = hasImage && !isProcessing, onClick = onAuto)
-            CompactIconButton(onClick = onDemo, icon = Icons.Outlined.AutoFixHigh, tint = Ink, enabled = !isProcessing, contentDescription = "Demo")
-            CompactIconButton(onClick = onUndo, icon = Icons.Outlined.Undo, tint = Ink, enabled = canUndo && !isProcessing, contentDescription = "Undo")
-            CompactIconButton(onClick = onRedo, icon = Icons.Outlined.Redo, tint = Ink, enabled = canRedo && !isProcessing, contentDescription = "Redo")
-            CompactIconButton(onClick = onCompare, icon = Icons.Outlined.Compare, tint = if (showOriginal) Flame else Ink, enabled = hasImage, contentDescription = "Before after")
-            CompactIconButton(onClick = onSplitCompare, icon = Icons.Outlined.Splitscreen, tint = if (showSplitCompare) Flame else Ink, enabled = hasImage, contentDescription = "Split compare")
-            CompactIconButton(onClick = onDebug, icon = Icons.Outlined.DataObject, tint = Ink, contentDescription = "Debug overlay")
-            CompactIconButton(onClick = onReset, icon = Icons.Outlined.RestartAlt, tint = Ink, enabled = hasImage && !isProcessing, contentDescription = "Reset")
-            CompactIconButton(onClick = onExport, icon = Icons.Outlined.Download, tint = Flame, enabled = hasImage && !isProcessing, contentDescription = "Export")
+            CompactIconButton(onClick = onDemo, icon = Icons.Outlined.AutoFixHigh, tint = Color.White, enabled = !isProcessing, contentDescription = "Demo")
+            CompactIconButton(onClick = onUndo, icon = Icons.Outlined.Undo, tint = Color.White, enabled = canUndo && !isProcessing, contentDescription = "Undo")
+            CompactIconButton(onClick = onRedo, icon = Icons.Outlined.Redo, tint = Color.White, enabled = canRedo && !isProcessing, contentDescription = "Redo")
+            CompactIconButton(onClick = onCompare, icon = Icons.Outlined.Compare, tint = if (showOriginal) Coral else Color.White, enabled = hasImage, contentDescription = "Before after")
+            CompactIconButton(onClick = onSplitCompare, icon = Icons.Outlined.Splitscreen, tint = if (showSplitCompare) Coral else Color.White, enabled = hasImage, contentDescription = "Split compare")
+            CompactIconButton(onClick = onDebug, icon = Icons.Outlined.DataObject, tint = Color.White, contentDescription = "Debug overlay")
+            CompactIconButton(onClick = onReset, icon = Icons.Outlined.RestartAlt, tint = Color.White, enabled = hasImage && !isProcessing, contentDescription = "Reset")
         }
     }
 }
@@ -303,10 +333,10 @@ private fun CompactTextButton(text: String, enabled: Boolean = true, onClick: ()
         text = text,
         modifier = Modifier
             .clip(RoundedCornerShape(7.dp))
-            .background(if (enabled) Ink else Muted.copy(alpha = .35f))
+            .background(if (enabled) Coral else SoftText.copy(alpha = .22f))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 8.dp),
-        color = Cream,
+        color = Color.White,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold
     )
@@ -324,7 +354,7 @@ private fun CompactIconButton(
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = if (enabled) tint else Muted.copy(alpha = .45f),
+            tint = if (enabled) tint else SoftText.copy(alpha = .34f),
             modifier = Modifier.size(20.dp)
         )
     }
@@ -343,8 +373,7 @@ private fun EditorStage(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Ink)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         val bitmap = if (uiState.showOriginal) uiState.previewSourceBitmap else uiState.previewBitmap
@@ -381,7 +410,8 @@ private fun EditorStage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.Black.copy(alpha = .28f))
                     .pointerInput(uiState.showSplitCompare, uiState.previewBitmap, uiState.sourceBitmap, uiState.healBrushEnabled, zoom, panX, panY) {
                         if (uiState.healBrushEnabled) {
                             awaitEachGesture {
@@ -485,15 +515,15 @@ private fun EditorStage(
                 }
                 if (zoom > 1f && zoomEnabled) {
                     Surface(
-                        color = Color.Black.copy(alpha = .54f),
-                        shape = RoundedCornerShape(8.dp),
+                        color = PanelDark.copy(alpha = .72f),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(8.dp)
                     ) {
                         Text(
                             text = "${String.format("%.1f", zoom)}x",
-                            color = Cream,
+                            color = Color.White,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
@@ -504,8 +534,8 @@ private fun EditorStage(
         }
         if (bitmap != null) {
             Surface(
-                color = Color.Black.copy(alpha = .58f),
-                shape = RoundedCornerShape(8.dp),
+                color = PanelDark.copy(alpha = .72f),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.align(Alignment.BottomStart)
             ) {
                 Text(
@@ -515,20 +545,20 @@ private fun EditorStage(
                         faceFocus -> "Face"
                         else -> "After"
                     },
-                    color = Cream,
+                    color = Color.White,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
             Surface(
-                color = Color.Black.copy(alpha = .58f),
-                shape = RoundedCornerShape(8.dp),
+                color = PanelDark.copy(alpha = .72f),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.align(Alignment.BottomEnd)
             ) {
                 Text(
                     text = "${uiState.renderStatus} - ${uiState.faceStatus}",
-                    color = Cream,
+                    color = Color.White,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
@@ -536,13 +566,13 @@ private fun EditorStage(
             }
         }
         AnimatedVisibility(visible = uiState.isProcessing, modifier = Modifier.align(Alignment.TopEnd)) {
-            Surface(color = Color.Black.copy(alpha = .72f), shape = RoundedCornerShape(8.dp)) {
+            Surface(color = PanelDark.copy(alpha = .82f), shape = RoundedCornerShape(12.dp)) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Cream)
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Coral)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         uiState.processingLabel.ifBlank { "Processing" },
-                        color = Cream,
+                        color = Color.White,
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
@@ -584,17 +614,17 @@ private fun EmptyImport(onPick: () -> Unit, onDemo: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(.78f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = .06f))
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.White.copy(alpha = .09f))
             .padding(24.dp)
     ) {
         Canvas(Modifier.size(136.dp)) {
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFE1492D), Color(0xFF2F6F73))), radius = size.minDimension / 2)
+            drawCircle(Brush.radialGradient(listOf(Coral, Teal, StudioBlack)), radius = size.minDimension / 2)
             drawCircle(Color.White.copy(alpha = .16f), radius = size.minDimension * .26f, center = Offset(size.width * .68f, size.height * .28f))
         }
         Spacer(Modifier.height(18.dp))
-        Text("Tap to import photo", color = Cream, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text("Phase 1 and 2 editor shell", color = Color(0xFFBFB8AE), style = MaterialTheme.typography.bodySmall)
+        Text("Tap to import photo", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Studio retouch workspace", color = SoftText, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ActionChip(icon = Icons.Outlined.Image, text = "Import", onClick = onPick)
@@ -958,8 +988,10 @@ private fun ControlSheet(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(190.dp),
-        color = Color(0xFFFAF8F2),
+            .height(206.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        color = PanelLight.copy(alpha = .96f),
+        shape = RoundedCornerShape(20.dp),
         shadowElevation = 10.dp
     ) {
         when (uiState.selectedPanel) {
@@ -1014,10 +1046,10 @@ private fun TransformControls(
 private fun AdjustControls(recipe: EditRecipe, onRecipeChange: (EditRecipe) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(FilterLook.entries) { look ->
-                    Pill(
-                        text = look.label,
+                    FilterLookCard(
+                        look = look,
                         selected = recipe.filterLook == look,
                         onClick = { onRecipeChange(recipe.copy(filterLook = look)) }
                     )
@@ -1180,7 +1212,11 @@ private fun TemplateControls(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(presets, key = { it.id }) { preset ->
-                    TemplateCard(preset = preset, onClick = { onTemplate(preset) })
+                    TemplateCard(
+                        preset = preset,
+                        selected = recipe == preset.recipe,
+                        onClick = { onTemplate(preset) }
+                    )
                 }
             }
         }
@@ -1246,24 +1282,105 @@ private fun TemplateControls(
 }
 
 @Composable
-private fun TemplateCard(preset: TemplatePreset, onClick: () -> Unit) {
-    Column(
+private fun FilterLookCard(look: FilterLook, selected: Boolean, onClick: () -> Unit) {
+    Box(
         modifier = Modifier
-            .width(132.dp)
-            .height(118.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White)
+            .width(104.dp)
+            .height(74.dp)
+            .graphicsLayer {
+                scaleX = if (selected) 1.02f else 1f
+                scaleY = if (selected) 1.02f else 1f
+            }
+            .clip(RoundedCornerShape(18.dp))
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) Coral else Color.White.copy(alpha = .34f),
+                shape = RoundedCornerShape(18.dp)
+            )
             .clickable(onClick = onClick)
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+            .background(StudioBlack)
     ) {
-        TemplateThumbnail(
-            recipe = preset.recipe,
+        Image(
+            painter = painterResource(filterLookPreviewRes(look)),
+            contentDescription = look.label,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .height(38.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = .78f))
+                    )
+                )
         )
+        Text(
+            look.label,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        )
+    }
+}
+
+private fun filterLookPreviewRes(look: FilterLook): Int = when (look) {
+    FilterLook.Clean -> R.drawable.filter_clean
+    FilterLook.Film -> R.drawable.filter_film
+    FilterLook.Cream -> R.drawable.filter_cream
+    FilterLook.Korean -> R.drawable.filter_korean
+    FilterLook.CoolWhite -> R.drawable.filter_cool_white
+    FilterLook.WarmPortrait -> R.drawable.filter_warm_portrait
+    FilterLook.Neo -> R.drawable.filter_neo
+}
+
+@Composable
+private fun TemplateCard(preset: TemplatePreset, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(142.dp)
+            .height(132.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) Coral else Color.White.copy(alpha = .52f),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .background(Color.White.copy(alpha = .9f))
+            .clickable(onClick = onClick)
+            .padding(7.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(StudioBlack)
+        ) {
+            Image(
+                painter = painterResource(templatePreviewRes(preset)),
+                contentDescription = preset.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = .32f))
+                        )
+                    )
+            )
+        }
         Text(
             preset.title,
             color = Ink,
@@ -1280,6 +1397,20 @@ private fun TemplateCard(preset: TemplatePreset, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+private fun templatePreviewRes(preset: TemplatePreset): Int = when (preset.id) {
+    "daily-clean" -> R.drawable.preset_daily_clean
+    "portrait-soft" -> R.drawable.preset_portrait_soft
+    "street-snap" -> R.drawable.preset_street_snap
+    "cool-white" -> R.drawable.preset_cool_white
+    "warm-portrait" -> R.drawable.preset_warm_portrait
+    "commerce-cutout" -> R.drawable.preset_commerce_cutout
+    "profile-headshot" -> R.drawable.preset_profile_headshot
+    "product-portrait" -> R.drawable.preset_product_portrait
+    "studio-slate" -> R.drawable.preset_studio_slate
+    "shape-studio" -> R.drawable.preset_shape_studio
+    else -> filterLookPreviewRes(preset.recipe.filterLook)
 }
 
 @Composable
@@ -1343,8 +1474,8 @@ private fun ExportPanel(
                 Button(
                     onClick = onExport,
                     enabled = uiState.previewBitmap != null && !uiState.isProcessing,
-                    colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Cream),
-                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = StudioBlack, contentColor = Color.White),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Outlined.Download, contentDescription = null)
@@ -1354,8 +1485,8 @@ private fun ExportPanel(
                 Button(
                     onClick = onShare,
                     enabled = uiState.lastExport != null && !uiState.isProcessing,
-                    colors = ButtonDefaults.buttonColors(containerColor = Flame, contentColor = Cream),
-                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = Color.White),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Outlined.Compare, contentDescription = null)
@@ -1395,8 +1526,8 @@ private fun ExportPanel(
                     Button(
                         onClick = onBenchmark,
                         enabled = uiState.previewBitmap != null && !uiState.isProcessing,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink),
-                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = .88f), contentColor = Ink),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Outlined.DataObject, contentDescription = null)
@@ -1423,7 +1554,7 @@ private fun ExportPanel(
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(uiState.editHistory, key = { "${it.title}-${it.recipe.hashCode()}" }) { item ->
-                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp)) {
+                        Surface(color = Color.White.copy(alpha = .82f), shape = RoundedCornerShape(12.dp)) {
                             Text(
                                 item.title,
                                 color = Ink,
@@ -1444,7 +1575,7 @@ private fun ExportPanel(
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(uiState.exportHistory, key = { it }) { entry ->
-                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp)) {
+                        Surface(color = Color.White.copy(alpha = .82f), shape = RoundedCornerShape(12.dp)) {
                             Text(
                                 entry,
                                 color = Ink,
@@ -1470,9 +1601,9 @@ private fun BottomTabs(selected: ToolPanel, onSelect: (ToolPanel) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Ink)
-            .height(54.dp)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .background(StudioBlack)
+            .height(68.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         ToolPanel.entries.forEach { panel ->
@@ -1506,14 +1637,14 @@ private fun TabButton(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Flame else Color.Transparent)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) Coral.copy(alpha = .94f) else Color.White.copy(alpha = .06f))
             .clickable(onClick = onClick)
-            .padding(vertical = 5.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = panel.title, tint = Cream, modifier = Modifier.size(20.dp))
-        Text(panel.title, color = Cream, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Icon(icon, contentDescription = panel.title, tint = Color.White, modifier = Modifier.size(20.dp))
+        Text(panel.title, color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
 }
 
@@ -1524,7 +1655,16 @@ private fun RecipeSlider(label: String, value: Float, range: ClosedFloatingPoint
             Text(label, color = Ink, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
             Text(String.format("%.2f", value), color = Muted, style = MaterialTheme.typography.labelMedium)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range)
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            colors = SliderDefaults.colors(
+                thumbColor = Coral,
+                activeTrackColor = Coral,
+                inactiveTrackColor = Color(0xFFD6DEE0)
+            )
+        )
     }
 }
 
@@ -1533,11 +1673,11 @@ private fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         text = text,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Ink else Color.White)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) StudioBlack else Color.White.copy(alpha = .78f))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        color = if (selected) Cream else Ink,
+        color = if (selected) Color.White else Ink,
         fontWeight = FontWeight.Bold
     )
 }
@@ -1546,8 +1686,8 @@ private fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
 private fun ActionChip(icon: ImageVector, text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = .82f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1564,7 +1704,7 @@ private fun MakeupPresetChip(preset: MakeupPreset, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.White)
+            .background(Color.White.copy(alpha = .82f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1589,8 +1729,8 @@ private fun TemplateMark() {
             lineTo(size.width, size.height * .68f)
             close()
         }
-        drawPath(path, Color(0xFFE1492D))
-        drawCircle(Color(0xFF2F6F73), radius = size.minDimension * .22f, center = Offset(size.width * .7f, size.height * .26f))
+        drawPath(path, Coral)
+        drawCircle(Teal, radius = size.minDimension * .22f, center = Offset(size.width * .7f, size.height * .26f))
     }
 }
 
@@ -1598,10 +1738,10 @@ private fun TemplateMark() {
 private fun LumiTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = androidx.compose.material3.lightColorScheme(
-            primary = Flame,
+            primary = Coral,
             secondary = Teal,
-            surface = Cream,
-            background = Cream,
+            surface = PanelLight,
+            background = StudioBlack,
             onSurface = Ink
         ),
         typography = androidx.compose.material3.Typography(),
@@ -1610,7 +1750,12 @@ private fun LumiTheme(content: @Composable () -> Unit) {
 }
 
 private val Cream = Color(0xFFF7F3ED)
-private val Ink = Color(0xFF151515)
-private val Muted = Color(0xFF77716A)
-private val Flame = Color(0xFFE1492D)
-private val Teal = Color(0xFF2F6F73)
+private val PanelLight = Color(0xFFF4F7F6)
+private val PanelDark = Color(0xFF101820)
+private val StudioBlack = Color(0xFF0E141A)
+private val Ink = Color(0xFF121820)
+private val Muted = Color(0xFF667078)
+private val SoftText = Color(0xFFB9C3C7)
+private val Coral = Color(0xFFFF6F61)
+private val Flame = Coral
+private val Teal = Color(0xFF2BA6A0)
